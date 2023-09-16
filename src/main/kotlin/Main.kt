@@ -4,7 +4,7 @@ import java.io.File
 import javax.imageio.ImageIO
 import java.awt.Desktop
 import java.io.IOException
-import kotlin.math.exp
+import java.util.*
 
 fun main() {
     // Initialize the input image
@@ -14,7 +14,6 @@ fun main() {
     val inputImage = ImageIO.read(File(inputImagePath))
     val width = inputImage.width
     val height = inputImage.height
-
     while (true) {
         println(
             """
@@ -31,40 +30,45 @@ fun main() {
         )
 
         val optionSelectedByUser: String? = readlnOrNull()
-        var outputImage: BufferedImage = inputImage
-
+        var outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
         when (optionSelectedByUser) {
             "1" -> {
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 applyGrayscaleFilter(outputImage, inputImage, width, height)
             }
             "2" -> {
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 println("Enter the brightness adjustment value (e.g., -50 to make it darker, 50 to make it brighter): ")
                 val brightnessAdjustment = readlnOrNull()?.toInt() ?: 0
                 changeBrightnessOfImage(outputImage, inputImage, brightnessAdjustment, width, height)
             }
             "3" -> {
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 println("Enter the contrast adjustment value (e.g., -50 to make it darker, 50 to make it brighter): ")
                 val contrastAdjustment = readlnOrNull()?.toInt() ?: 0
                 changeContrastOfImage(outputImage, inputImage, contrastAdjustment, width, height)
             }
             "4" -> {
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 println("How do you want to flip the Image ? [1. Horizontally | 2. Vertically]")
                 val choiceOfFlip = readln().toInt()
                 flipImage(outputImage, inputImage, choiceOfFlip, width, height)
             }
             "5" -> {
+                outputImage = BufferedImage(height, width, BufferedImage.TYPE_INT_RGB)
                 println("How do you want to rotate the Image ? [1. Clockwise | 2. AntiClockwise]")
                 val choiceOfRotate = readln().toInt()
                 rotateImage(outputImage, inputImage, choiceOfRotate, width, height)
             }
             "6" -> {
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 println("Enter blur intensity (e.g., 1 for light blur, 5 for strong blur)")
                 val blurIntensity: Int = readln().toInt()
                 blurImage(outputImage, inputImage, blurIntensity, width, height)
             }
             "7" -> {
                 println(
-                    """Select The Filters You Want to Apply on the Image
+                    """Select The Filters You Want to Apply on the Image :
                     1. Vintage
                     2. CyberPunk
                     3. Funky
@@ -72,6 +76,7 @@ fun main() {
                     5. Black and White
                     """.trimIndent()
                 )
+                outputImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
                 val filterChoice: Int = readln().toInt()
                 applyFilters(outputImage, inputImage,filterChoice, width, height)
             }
@@ -112,7 +117,7 @@ fun applyGrayscaleFilter(outputImage : BufferedImage,inputImage: BufferedImage, 
             outputImage.setRGB(x, y, grayColor.rgb)
         }
     }
-    print("Image Processing Successful. GrayScale Completed")
+    print("Image Processing Successful. GrayScale Completed\n")
 }
 
 
@@ -182,49 +187,88 @@ fun rotateImage(outputImage : BufferedImage,inputImage : BufferedImage, choiceOf
             }
         }
     }
-
 }
 
 
 fun blurImage(outputImage : BufferedImage,inputImage : BufferedImage,blurIntensity : Int,width : Int, height: Int): BufferedImage {
-    val kernelSize = blurIntensity * 2 + 1
-    val kernel = FloatArray(kernelSize)
 
-    val sigma = blurIntensity / 3.0f
-    val twoSigmaSquare = 2.0f * sigma * sigma
-    val sigmaRoot = Math.sqrt(twoSigmaSquare * Math.PI).toFloat()
+    val tempImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
 
-    var total = 0.0f
+    // Horizontal pass
+    for (y in 0..<height) {
+        val dequeRed: Deque<Int> = LinkedList()
+        val dequeGreen: Deque<Int> = LinkedList()
+        val dequeBlue: Deque<Int> = LinkedList()
 
-    for (x in -blurIntensity..blurIntensity) {
-        val distance = x * x
-        kernel[x + blurIntensity] = (exp((-distance / twoSigmaSquare).toDouble()) / sigmaRoot).toFloat()
-        total += kernel[x + blurIntensity]
-    }
+        var sumRed = 0
+        var sumGreen = 0
+        var sumBlue = 0
 
-    // Normalize the kernel
-    for (i in kernel.indices) {
-        kernel[i] /= total
-    }
-
-    for (x in 0..<width) {
-        for (y in 0..<height) {
-            var r = 0.0f
-            var g = 0.0f
-            var b = 0.0f
-
-            for (dx in -blurIntensity..blurIntensity) {
-                val px = (x + dx).coerceIn(0, width - 1)
-                val pixelColor = Color(inputImage.getRGB(px, y))
-                val weight = kernel[dx + blurIntensity]
-
-                r += pixelColor.red * weight
-                g += pixelColor.green * weight
-                b += pixelColor.blue * weight
+        for (x in -blurIntensity..<width + blurIntensity) {
+            if (x >= blurIntensity * 2 + 1) {
+                sumRed -= dequeRed.removeFirst()
+                sumGreen -= dequeGreen.removeFirst()
+                sumBlue -= dequeBlue.removeFirst()
             }
 
-            val blurredColor = Color(r.toInt(), g.toInt(), b.toInt())
-            outputImage.setRGB(x, y, blurredColor.rgb)
+            val newX = x.coerceIn(0, width - 1)
+            val pixel = Color(inputImage.getRGB(newX, y))
+
+            dequeRed.addLast(pixel.red)
+            dequeGreen.addLast(pixel.green)
+            dequeBlue.addLast(pixel.blue)
+
+            sumRed += pixel.red
+            sumGreen += pixel.green
+            sumBlue += pixel.blue
+
+            if (x >= blurIntensity) {
+                val pixels = dequeRed.size
+                val avgRed = sumRed / pixels
+                val avgGreen = sumGreen / pixels
+                val avgBlue = sumBlue / pixels
+                val blurredPixel = Color(avgRed, avgGreen, avgBlue)
+                tempImage.setRGB(x - blurIntensity, y, blurredPixel.rgb)
+            }
+        }
+    }
+
+    // Vertical pass
+    for (x in 0..<width) {
+        val dequeRed: Deque<Int> = LinkedList()
+        val dequeGreen: Deque<Int> = LinkedList()
+        val dequeBlue: Deque<Int> = LinkedList()
+
+        var sumRed = 0
+        var sumGreen = 0
+        var sumBlue = 0
+
+        for (y in -blurIntensity..<height + blurIntensity) {
+            if (y >= blurIntensity * 2 + 1) {
+                sumRed -= dequeRed.removeFirst()
+                sumGreen -= dequeGreen.removeFirst()
+                sumBlue -= dequeBlue.removeFirst()
+            }
+
+            val newY = y.coerceIn(0, height - 1)
+            val pixel = Color(tempImage.getRGB(x, newY))
+
+            dequeRed.addLast(pixel.red)
+            dequeGreen.addLast(pixel.green)
+            dequeBlue.addLast(pixel.blue)
+
+            sumRed += pixel.red
+            sumGreen += pixel.green
+            sumBlue += pixel.blue
+
+            if (y >= blurIntensity) {
+                val pixels = dequeRed.size
+                val avgRed = sumRed / pixels
+                val avgGreen = sumGreen / pixels
+                val avgBlue = sumBlue / pixels
+                val blurredPixel = Color(avgRed, avgGreen, avgBlue)
+                outputImage.setRGB(x, y - blurIntensity, blurredPixel.rgb)
+            }
         }
     }
 
